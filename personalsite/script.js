@@ -13,76 +13,107 @@ document.addEventListener('DOMContentLoaded', function() {
 // Contact Form Validation
 document.addEventListener('DOMContentLoaded', function() {
     const contactForm = document.getElementById('contactForm');
-    
-    if (contactForm) {
-        contactForm.addEventListener('submit', function(e) {
+
+    if (!contactForm) {
+        return;
+    }
+
+    const submitButton = contactForm.querySelector('button[type="submit"]');
+    const formStatus = document.getElementById('formStatus');
+    const nextInput = document.getElementById('formNextUrl');
+
+    if (nextInput) {
+        const thankYouUrl = new URL('thankyou.html', window.location.href);
+        nextInput.value = thankYouUrl.href;
+    }
+
+    contactForm.addEventListener('submit', function(e) {
+        clearErrorMessages();
+        resetFormStatus();
+        setSubmittingState(false);
+
+        let isValid = true;
+
+        const firstName = document.getElementById('firstName');
+        if (!firstName.value.trim()) {
+            showError('firstNameError', 'First name is required');
+            isValid = false;
+        }
+
+        const lastName = document.getElementById('lastName');
+        if (!lastName.value.trim()) {
+            showError('lastNameError', 'Last name is required');
+            isValid = false;
+        }
+
+        const email = document.getElementById('email');
+        const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
+        if (!email.value.trim()) {
+            showError('emailError', 'Email address is required');
+            isValid = false;
+        } else if (!emailPattern.test(email.value)) {
+            showError('emailError', 'Please enter a valid email address');
+            isValid = false;
+        }
+
+        if (!isValid) {
             e.preventDefault();
-            
-            // Clear previous error messages
-            clearErrorMessages();
-            
-            // Validate form
-            let isValid = true;
-            
-            // Validate First Name
-            const firstName = document.getElementById('firstName');
-            if (!firstName.value.trim()) {
-                showError('firstNameError', 'First name is required');
-                isValid = false;
-            }
-            
-            // Validate Last Name
-            const lastName = document.getElementById('lastName');
-            if (!lastName.value.trim()) {
-                showError('lastNameError', 'Last name is required');
-                isValid = false;
-            }
-            
-            // Validate Email
-            const email = document.getElementById('email');
-            const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
-            if (!email.value.trim()) {
-                showError('emailError', 'Email address is required');
-                isValid = false;
-            } else if (!emailPattern.test(email.value)) {
-                showError('emailError', 'Please enter a valid email address');
-                isValid = false;
-            }
-            
-            // Validate Password
-            const password = document.getElementById('password');
-            if (!password.value) {
-                showError('passwordError', 'Password is required');
-                isValid = false;
-            } else if (password.value.length < 8) {
-                showError('passwordError', 'Password must be at least 8 characters long');
-                isValid = false;
-            }
-            
-            // Validate Confirm Password
-            const confirmPassword = document.getElementById('confirmPassword');
-            if (!confirmPassword.value) {
-                showError('confirmPasswordError', 'Please confirm your password');
-                isValid = false;
-            } else if (password.value !== confirmPassword.value) {
-                showError('confirmPasswordError', 'Passwords do not match');
-                isValid = false;
-            }
-            
-            // If form is valid, redirect to thank you page
-            if (isValid) {
-                // Store form data in sessionStorage for thank you page
-                const formData = {
-                    firstName: firstName.value,
-                    lastName: lastName.value,
-                    email: email.value
-                };
-                sessionStorage.setItem('formData', JSON.stringify(formData));
-                
-                // Redirect to thank you page
-                window.location.href = 'thankyou.html';
-            }
-        });
+            showFormStatus('Please fix the highlighted fields and try again.', 'error');
+            return;
+        }
+
+        const firstNameValue = firstName.value.trim();
+        const lastNameValue = lastName.value.trim();
+        const emailValue = email.value.trim();
+
+        const replyToInput = document.getElementById('formReplyTo');
+        if (replyToInput) {
+            replyToInput.value = emailValue;
+        }
+
+        const subjectInput = contactForm.querySelector('input[name="_subject"]');
+        if (subjectInput) {
+            const fullName = [firstNameValue, lastNameValue].filter(Boolean).join(' ');
+            subjectInput.value = fullName ? `Portfolio contact from ${fullName}` : 'New message from personasite contact form';
+        }
+
+        try {
+            const formData = {
+                firstName: firstNameValue,
+                lastName: lastNameValue,
+                email: emailValue
+            };
+            sessionStorage.setItem('formData', JSON.stringify(formData));
+        } catch (error) {
+            console.warn('Unable to store contact form data in sessionStorage:', error);
+        }
+
+        setSubmittingState(true);
+        showFormStatus('Sending your message...', 'info');
+    });
+
+    function setSubmittingState(isSubmitting) {
+        if (!submitButton) return;
+
+        submitButton.disabled = isSubmitting;
+        submitButton.textContent = isSubmitting ? 'Sending...' : 'Send Message';
+    }
+
+    function resetFormStatus() {
+        if (!formStatus) return;
+
+        formStatus.textContent = '';
+        formStatus.style.display = 'none';
+        formStatus.classList.remove('error', 'success', 'info');
+    }
+
+    function showFormStatus(message, type) {
+        if (!formStatus) return;
+
+        formStatus.textContent = message;
+        formStatus.style.display = 'block';
+        formStatus.classList.remove('error', 'success', 'info');
+        formStatus.classList.add(type);
     }
 });
 
@@ -101,6 +132,11 @@ function clearErrorMessages() {
     errorMessages.forEach(error => {
         error.textContent = '';
         error.style.display = 'none';
+    });
+
+    const formFields = document.querySelectorAll('#contactForm input, #contactForm textarea');
+    formFields.forEach(field => {
+        field.style.borderColor = '';
     });
 }
 
@@ -156,26 +192,6 @@ function validateField(field) {
             }
             break;
             
-        case 'password':
-            if (!field.value) {
-                isValid = false;
-                errorMessage = 'Password is required';
-            } else if (field.value.length < 8) {
-                isValid = false;
-                errorMessage = 'Password must be at least 8 characters long';
-            }
-            break;
-            
-        case 'confirmPassword':
-            const password = document.getElementById('password');
-            if (!field.value) {
-                isValid = false;
-                errorMessage = 'Please confirm your password';
-            } else if (password.value !== field.value) {
-                isValid = false;
-                errorMessage = 'Passwords do not match';
-            }
-            break;
     }
     
     if (!isValid) {
@@ -210,20 +226,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Add loading state to form submission
-document.addEventListener('DOMContentLoaded', function() {
-    const contactForm = document.getElementById('contactForm');
-    
-    if (contactForm) {
-        const submitButton = contactForm.querySelector('button[type="submit"]');
-        
-        contactForm.addEventListener('submit', function() {
-            if (submitButton) {
-                submitButton.textContent = 'Sending...';
-                submitButton.disabled = true;
-            }
-        });
-    }
-});
 
 // Close mobile menu when clicking on a link
 document.addEventListener('DOMContentLoaded', function() {
